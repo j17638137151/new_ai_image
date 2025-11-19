@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/filter_model.dart';
 import '../services/filter_service.dart';
+import '../services/generation_history_api_service.dart';
 
 class AiFilterResultPage extends StatefulWidget {
   final String originalImagePath;
@@ -80,6 +82,17 @@ class _AiFilterResultPageState extends State<AiFilterResultPage>
             _currentImagePath = result; // 更新为AI处理后的图片
             _isFilterChanging = false;
           });
+
+          // 滤镜应用成功，立即同步到生成历史
+          unawaited(
+            GenerationHistoryApiService.syncGenerationResult(
+              localFilePath: result,
+              type: 'filter',
+              effectId: widget.filterId,
+            ).catchError((e, stack) {
+              debugPrint('同步滤镜历史失败: $e');
+            }),
+          );
         } else {
           setState(() {
             _isFilterChanging = false;

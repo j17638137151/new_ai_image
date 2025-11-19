@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import '../services/ai_model_service.dart';
+import '../services/generation_history_api_service.dart';
 
 // 消息类型枚举
 enum MessageType { text, voice, imageResult }
@@ -162,6 +163,9 @@ class _CustomAiEditChatPageState extends State<CustomAiEditChatPage>
   // 继续编辑状态管理
   String _baseImagePath = ''; // 当前编辑的基础图片路径
   bool _isEditingProcessedImage = false; // 是否正在编辑处理后的图片
+
+  // 保存每个生成图片对应的prompt
+  final Map<String, String> _imagePrompts = {};
 
   // 动画控制器（用于语音球体动画）
   late AnimationController _voiceAnimationController;
@@ -620,10 +624,23 @@ class _CustomAiEditChatPageState extends State<CustomAiEditChatPage>
           if (result != null) {
             // AI处理成功
             debugPrint('✅ AI处理成功: $result');
+            // 保存图片路径和对应的prompt
+            _imagePrompts[result] = userInput;
             _messages[index] = processingMessage.copyWith(
               content: '已为您完成图片编辑',
               isProcessing: false,
               processedImagePath: result,
+            );
+
+            // AI处理成功，立即同步到生成历史
+            unawaited(
+              GenerationHistoryApiService.syncGenerationResult(
+                localFilePath: result,
+                type: 'custom',
+                prompt: userInput,
+              ).catchError((e, stack) {
+                debugPrint('同步自定义编辑历史失败: $e');
+              }),
             );
           } else {
             // AI处理失败

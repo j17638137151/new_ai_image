@@ -11,6 +11,7 @@ import '../models/photobooth_model.dart';
 import '../services/generation_service.dart';
 import '../services/gallery_service.dart';
 import '../services/enhance_service.dart';
+import '../services/auth_guard.dart';
 import '../widgets/generation_status_bar.dart';
 import '../widgets/expandable_fab.dart';
 import 'photo_gallery_page.dart';
@@ -86,7 +87,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       Phoenix.rebirth(context);
     }
   }
-
 
   // 初始化权限检查和相册
   Future<void> _initializePermissionsAndGallery() async {
@@ -303,8 +303,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // 处理操作按钮点击
-  void _onActionButtonTapped(String action) async {
+  Future<void> _onActionButtonTapped(String action) async {
     debugPrint('点击了操作按钮: $action');
+
+    // 所有生成相关操作前统一鉴权
+    final loggedIn = await AuthGuard.ensureLoggedIn(context);
+    if (!loggedIn) {
+      debugPrint('未登录，已中断操作: $action');
+      return;
+    }
 
     switch (action) {
       case 'enhance':
@@ -654,15 +661,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
           // 新的扇形展开FAB
           Positioned.fill(
-            child: ExpandableFab(
-              onActionTapped: _onActionButtonTapped,
-            ),
+            child: ExpandableFab(onActionTapped: _onActionButtonTapped),
           ),
         ],
       ),
     );
   }
-
 
   List<Widget> _buildCategorySections() {
     List<Widget> sections = [];
@@ -873,7 +877,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     debugPrint('查看更多: ${category.title}');
   }
 
-  void _onImageTapped(CategoryModel category, int index) {
+  Future<void> _onImageTapped(CategoryModel category, int index) async {
+    // 所有点击卡片进入生成流程前统一鉴权
+    final loggedIn = await AuthGuard.ensureLoggedIn(context);
+    if (!loggedIn) {
+      debugPrint('未登录，已中断分类点击: ${category.id}, index: $index');
+      return;
+    }
+
     if (category.id == 'photobooth') {
       // Photobooth分类点击跳转到PhotoUploadPage，传递effectId
       final effects = PhotoboothModel.getAllEffects();

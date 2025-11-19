@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../services/generation_history_api_service.dart';
 
 class AIResultPage extends StatefulWidget {
   final List<String> originalPhotoPaths; // 用户上传的原始照片路径
@@ -36,6 +38,9 @@ class _AIResultPageState extends State<AIResultPage>
   void initState() {
     super.initState();
     _initializeGeneratedPhotos();
+
+    // AI生成完成，立即同步所有图片到生成历史
+    _syncGeneratedPhotosToHistory();
 
     // 初始化删除动画
     _deleteAnimationController = AnimationController(
@@ -80,6 +85,26 @@ class _AIResultPageState extends State<AIResultPage>
       debugPrint(
         '⚠️ AIResultPage: AI生成失败或为空，使用原图作为fallback，共${_generatedPhotos.length}张',
       );
+    }
+  }
+
+  // 同步所有生成的照片到历史
+  void _syncGeneratedPhotosToHistory() {
+    // 只同步真实AI生成的图片（不包括fallback的原图）
+    if (widget.generatedPhotoPaths != null &&
+        widget.generatedPhotoPaths!.isNotEmpty) {
+      for (final imagePath in _generatedPhotos) {
+        unawaited(
+          GenerationHistoryApiService.syncGenerationResult(
+            localFilePath: imagePath,
+            type: 'photoshoot',
+            effectId: widget.themeId,
+          ).catchError((e, stack) {
+            debugPrint('同步写真历史失败: $e');
+          }),
+        );
+      }
+      debugPrint('✅ 已同步${_generatedPhotos.length}张写真照片到历史');
     }
   }
 

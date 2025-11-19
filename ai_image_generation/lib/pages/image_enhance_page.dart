@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'effect_preview_page.dart';
+import '../services/generation_history_api_service.dart';
 
 // 处理状态枚举
 enum ProcessingState {
-  initial,    // 初始状态，显示原图和增强按钮
-  uploading,  // 正在上传照片
+  initial, // 初始状态，显示原图和增强按钮
+  uploading, // 正在上传照片
   processing, // 正在重构细节
   showingTip, // 显示面部修饰提示
-  completed,  // 处理完成，显示对比结果
+  completed, // 处理完成，显示对比结果
 }
 
 class ImageEnhancePage extends StatefulWidget {
@@ -29,7 +31,6 @@ class ImageEnhancePage extends StatefulWidget {
 
 class _ImageEnhancePageState extends State<ImageEnhancePage>
     with TickerProviderStateMixin {
-
   late AnimationController _loadingController;
   double _sliderPosition = 0.5; // 分割线位置，0.0-1.0
   bool _showTipDialog = true; // 控制是否显示提示弹窗
@@ -40,12 +41,24 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
   @override
   void initState() {
     super.initState();
-    
+
     // 加载动画控制器
     _loadingController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
+
+    // 如果有增强后的图片，立即同步到生成历史
+    if (widget.enhancedImagePath != null) {
+      unawaited(
+        GenerationHistoryApiService.syncGenerationResult(
+          localFilePath: widget.enhancedImagePath!,
+          type: 'enhance',
+        ).catchError((e, stack) {
+          debugPrint('同步增强历史失败: $e');
+        }),
+      );
+    }
   }
 
   @override
@@ -53,7 +66,6 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
     _loadingController.dispose();
     super.dispose();
   }
-
 
   // 关闭提示弹窗
   void _dismissTipDialog() {
@@ -66,8 +78,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
   Future<void> _downloadImage() async {
     try {
       // 优先下载处理后的图片，如果没有则下载原图
-      final String? imageToDownload = _processedImagePath ?? widget.enhancedImagePath ?? widget.imagePath;
-      
+      final String? imageToDownload =
+          _processedImagePath ?? widget.enhancedImagePath ?? widget.imagePath;
+
       if (imageToDownload == null) {
         _showBeautifulDialog('没有可下载的图片', isError: true);
         return;
@@ -138,7 +151,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: isError ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                    color: isError
+                        ? Colors.red.withOpacity(0.1)
+                        : Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Icon(
@@ -147,9 +162,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     size: 30,
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // 标题
                 Text(
                   isError ? '操作失败' : '保存成功',
@@ -159,9 +174,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     color: Colors.black87,
                   ),
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // 消息内容
                 Text(
                   message,
@@ -172,9 +187,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     height: 1.4,
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // 确定按钮
                 SizedBox(
                   width: double.infinity,
@@ -204,7 +219,7 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
         );
       },
     );
-    
+
     // 3秒后自动关闭（仅成功时）
     if (!isError) {
       Future.delayed(const Duration(seconds: 3), () {
@@ -214,32 +229,35 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
       });
     }
   }
-  
+
   // 开始工具处理
   void _startToolProcessing(String toolId) async {
     setState(() {
       _selectedToolId = toolId;
       _isProcessingTool = true;
     });
-    
+
     _loadingController.repeat();
-    
+
     // 模拟处理时间（3秒）
     await Future.delayed(const Duration(seconds: 3));
-    
+
     if (mounted) {
       _loadingController.stop();
       setState(() {
         _isProcessingTool = false;
       });
-      
+
       // 跳转到效果预览页面并等待返回结果
       final result = await Navigator.push<String>(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               EffectPreviewPage(
-                imagePath: _processedImagePath ?? widget.enhancedImagePath ?? widget.imagePath!, // 🔥 使用当前显示的图片
+                imagePath:
+                    _processedImagePath ??
+                    widget.enhancedImagePath ??
+                    widget.imagePath!, // 🔥 使用当前显示的图片
                 effectType: toolId,
               ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -247,9 +265,10 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
             const end = Offset.zero;
             const curve = Curves.easeInOut;
 
-            var tween = Tween(begin: begin, end: end).chain(
-              CurveTween(curve: curve),
-            );
+            var tween = Tween(
+              begin: begin,
+              end: end,
+            ).chain(CurveTween(curve: curve));
 
             return SlideTransition(
               position: animation.drive(tween),
@@ -259,7 +278,7 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
           transitionDuration: const Duration(milliseconds: 300),
         ),
       );
-      
+
       // 处理返回的结果
       if (result != null && result.isNotEmpty) {
         debugPrint('✅ 接收到处理后的图片: $result');
@@ -269,7 +288,7 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
       }
     }
   }
-  
+
   // 取消工具处理
   void _cancelToolProcessing() {
     _loadingController.stop();
@@ -290,22 +309,19 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
             height: double.infinity,
             color: Colors.black.withOpacity(0.8),
           ),
-          
+
           // 主要内容 - 直接显示完成状态的对比页面
           _buildCompletedView(),
-          
+
           // 底部处理进度栏
-          if (_isProcessingTool)
-            _buildProcessingBar(),
-          
+          if (_isProcessingTool) _buildProcessingBar(),
+
           // 面部修饰提示弹窗 - 进入时立即显示
-          if (_showTipDialog)
-            _buildTipDialog(),
+          if (_showTipDialog) _buildTipDialog(),
         ],
       ),
     );
   }
-
 
   // 完成视图：显示对比结果
   Widget _buildCompletedView() {
@@ -334,9 +350,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     ),
                   ),
                 ),
-                
+
                 const Spacer(),
-                
+
                 // 效果标题
                 const Text(
                   '效果',
@@ -346,9 +362,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                
+
                 const Spacer(),
-                
+
                 // 下载按钮
                 GestureDetector(
                   onTap: _downloadImage,
@@ -370,12 +386,10 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
             ),
           ),
         ),
-        
+
         // 对比图片区域
-        Expanded(
-          child: _buildComparisonView(),
-        ),
-        
+        Expanded(child: _buildComparisonView()),
+
         // 底部功能栏
         _buildBottomToolbar(),
       ],
@@ -405,7 +419,7 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                         )
                       : Container(color: Colors.grey.shade700),
                 ),
-                
+
                 // 右侧：处理后图片
                 Expanded(
                   flex: ((1 - _sliderPosition) * 100).round(),
@@ -417,68 +431,70 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                           height: double.infinity,
                         )
                       : (widget.enhancedImagePath != null
-                          ? Image.file(
-                              File(widget.enhancedImagePath!), // 🎯 次选AI增强后的图片
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                            )
-                          : (widget.imagePath != null 
-                              ? Image.file(
-                                  File(widget.imagePath!), // 最后回退到原图
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                )
-                              : Container(color: Colors.grey.shade800)
-                            )
-                        ),
+                            ? Image.file(
+                                File(
+                                  widget.enhancedImagePath!,
+                                ), // 🎯 次选AI增强后的图片
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                              )
+                            : (widget.imagePath != null
+                                  ? Image.file(
+                                      File(widget.imagePath!), // 最后回退到原图
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    )
+                                  : Container(color: Colors.grey.shade800))),
                 ),
               ],
             ),
-            
+
             // 标签
             Positioned(
               top: 20,
               left: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Text(
                   '处理前',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ),
-            
+
             Positioned(
               top: 20,
               right: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Text(
                   '处理后',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ),
-            
+
             // 中间分割线
             Positioned(
-              left: (MediaQuery.of(context).size.width - 40) * _sliderPosition - 1,
+              left:
+                  (MediaQuery.of(context).size.width - 40) * _sliderPosition -
+                  1,
               top: 0,
               bottom: 0,
               width: 2,
@@ -495,17 +511,23 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                 ),
               ),
             ),
-            
+
             // 拖动手柄
             Positioned(
-              left: (MediaQuery.of(context).size.width - 40) * _sliderPosition - 20,
+              left:
+                  (MediaQuery.of(context).size.width - 40) * _sliderPosition -
+                  20,
               top: MediaQuery.of(context).size.height * 0.4,
               child: GestureDetector(
                 onPanUpdate: (details) {
                   setState(() {
                     final screenWidth = MediaQuery.of(context).size.width - 40;
-                    final newPosition = (details.globalPosition.dx - 20) / screenWidth;
-                    _sliderPosition = newPosition.clamp(0.1, 0.9); // 限制在10%-90%之间
+                    final newPosition =
+                        (details.globalPosition.dx - 20) / screenWidth;
+                    _sliderPosition = newPosition.clamp(
+                      0.1,
+                      0.9,
+                    ); // 限制在10%-90%之间
                   });
                 },
                 child: Container(
@@ -530,14 +552,15 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                 ),
               ),
             ),
-            
+
             // 全屏拖动区域（透明）
             Positioned.fill(
               child: GestureDetector(
                 onPanUpdate: (details) {
                   setState(() {
                     final screenWidth = MediaQuery.of(context).size.width - 40;
-                    final newPosition = (details.globalPosition.dx - 20) / screenWidth;
+                    final newPosition =
+                        (details.globalPosition.dx - 20) / screenWidth;
                     _sliderPosition = newPosition.clamp(0.1, 0.9);
                   });
                 },
@@ -553,10 +576,22 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
   // 底部工具栏
   Widget _buildBottomToolbar() {
     final tools = [
-      {'id': 'background_blur', 'icon': Icons.blur_on, 'label': 'Background\nBlur'},
+      {
+        'id': 'background_blur',
+        'icon': Icons.blur_on,
+        'label': 'Background\nBlur',
+      },
       {'id': 'colors', 'icon': Icons.color_lens, 'label': 'Colors'},
-      {'id': 'background_enhancer', 'icon': Icons.landscape, 'label': 'Background\nEnhancer'},
-      {'id': 'face_retouch', 'icon': Icons.face_retouching_natural, 'label': 'Face\nRetouch'},
+      {
+        'id': 'background_enhancer',
+        'icon': Icons.landscape,
+        'label': 'Background\nEnhancer',
+      },
+      {
+        'id': 'face_retouch',
+        'icon': Icons.face_retouching_natural,
+        'label': 'Face\nRetouch',
+      },
       {'id': 'face_enhancer', 'icon': Icons.face, 'label': 'Face\nEnhancer'},
     ];
 
@@ -585,10 +620,7 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     decoration: BoxDecoration(
                       color: isSelected ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Colors.white54,
-                        width: 1,
-                      ),
+                      border: Border.all(color: Colors.white54, width: 1),
                     ),
                     child: Icon(
                       tool['icon'] as IconData,
@@ -659,9 +691,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                       },
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // 加工文字
                   const Text(
                     '加工...',
@@ -674,9 +706,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                 ],
               ),
             ),
-            
+
             const SizedBox(width: 16),
-            
+
             // 关闭按钮
             GestureDetector(
               onTap: _cancelToolProcessing,
@@ -687,11 +719,7 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                   color: Colors.white24,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: 18,
-                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 18),
               ),
             ),
           ],
@@ -729,15 +757,11 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                       bottomRight: Radius.circular(40),
                     ),
                   ),
-                  child: const Icon(
-                    Icons.face,
-                    color: Colors.white,
-                    size: 40,
-                  ),
+                  child: const Icon(Icons.face, color: Colors.white, size: 40),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // 标题
                 const Text(
                   '面部修饰',
@@ -747,9 +771,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                     color: Colors.black,
                   ),
                 ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // 说明文字
                 const Text(
                   '面部修饰是一个受欢迎的功能，但仅负责任地使用。\n\n如果你发现这些增强功能影响了你的自我形象或自信心，请知道你可以随时在设置中的增强工具偏好关闭面部修饰功能。\n\n你的形象，你做主。',
@@ -760,9 +784,9 @@ class _ImageEnhancePageState extends State<ImageEnhancePage>
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // 确认按钮
                 GestureDetector(
                   onTap: _dismissTipDialog,

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/explore_item_model.dart';
 import '../models/comment_model.dart';
+import '../services/auth_guard.dart';
 import 'create_similar_page.dart';
 
 class ExploreDetailPage extends StatefulWidget {
   final ExploreItemModel item;
 
-  const ExploreDetailPage({
-    super.key,
-    required this.item,
-  });
+  const ExploreDetailPage({super.key, required this.item});
 
   @override
   State<ExploreDetailPage> createState() => _ExploreDetailPageState();
@@ -48,31 +46,14 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
           children: [
             // 主要内容
             CustomScrollView(
-            slivers: [
-              // 大图展示
-              SliverAppBar(
-                expandedHeight: MediaQuery.of(context).size.height * 0.6,
-                pinned: true,
-                backgroundColor: Colors.transparent,
-                leading: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                actions: [
-                  IconButton(
-                    onPressed: _onShare,
+              slivers: [
+                // 大图展示
+                SliverAppBar(
+                  expandedHeight: MediaQuery.of(context).size.height * 0.6,
+                  pinned: true,
+                  backgroundColor: Colors.transparent,
+                  leading: IconButton(
+                    onPressed: () => Navigator.pop(context),
                     icon: Container(
                       width: 40,
                       height: 40,
@@ -81,51 +62,68 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Icon(
-                        Icons.share,
+                        Icons.arrow_back,
                         color: Colors.white,
                         size: 20,
                       ),
                     ),
                   ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  background: _buildMainImage(),
+                  actions: [
+                    IconButton(
+                      onPressed: _onShare,
+                      icon: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.share,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: _buildMainImage(),
+                  ),
                 ),
-              ),
 
-              // 内容区域
-              SliverToBoxAdapter(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0A0A0A),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
+                // 内容区域
+                SliverToBoxAdapter(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0A0A0A),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 作者信息栏
+                        _buildAuthorSection(),
+
+                        // 创作信息
+                        _buildCreationInfo(),
+
+                        // 使用统计
+                        _buildUsageStats(),
+
+                        // 评论区域
+                        _buildCommentsSection(),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 作者信息栏
-                      _buildAuthorSection(),
-                      
-                      // 创作信息
-                      _buildCreationInfo(),
-                      
-                      // 使用统计
-                      _buildUsageStats(),
-                      
-                      // 评论区域
-                      _buildCommentsSection(),
-                    ],
-                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          // 底部操作栏
-          _buildBottomActionBar(),
+            // 底部操作栏
+            _buildBottomActionBar(),
           ],
         ),
       ),
@@ -139,10 +137,7 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.black26,
-          ],
+          colors: [Colors.transparent, Colors.black26],
         ),
       ),
       child: widget.item.imageUrl.startsWith('assets/')
@@ -203,14 +198,10 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               color: const Color(0xFF404040),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const Icon(Icons.person, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 12),
-          
+
           // 作者信息
           Expanded(
             child: Column(
@@ -235,14 +226,16 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               ],
             ),
           ),
-          
+
           // 关注按钮
           GestureDetector(
             onTap: _toggleFollow,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: _isFollowed ? const Color(0xFF404040) : const Color(0xFFFF4757),
+                color: _isFollowed
+                    ? const Color(0xFF404040)
+                    : const Color(0xFFFF4757),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
@@ -297,9 +290,9 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // 描述文本
           Text(
             widget.item.description,
@@ -344,9 +337,9 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // 评论输入框
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -389,12 +382,12 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // 评论列表
           ..._comments.map((comment) => _buildCommentItem(comment)),
-          
+
           const SizedBox(height: 100), // 底部间距，避免被操作栏遮挡
         ],
       ),
@@ -422,9 +415,9 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               size: 20,
             ),
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // 评论内容
           Expanded(
             child: Column(
@@ -452,9 +445,9 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 4),
-                
+
                 // 评论文本
                 if (comment.content.isNotEmpty)
                   Text(
@@ -465,7 +458,7 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
                       height: 1.4,
                     ),
                   ),
-                
+
                 // 评论图片
                 if (comment.imageUrl != null) ...[
                   const SizedBox(height: 8),
@@ -476,20 +469,14 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
                       height: 120,
                       color: const Color(0xFF2F2F2F),
                       child: comment.imageUrl!.startsWith('assets/')
-                          ? Image.asset(
-                              comment.imageUrl!,
-                              fit: BoxFit.cover,
-                            )
-                          : Image.network(
-                              comment.imageUrl!,
-                              fit: BoxFit.cover,
-                            ),
+                          ? Image.asset(comment.imageUrl!, fit: BoxFit.cover)
+                          : Image.network(comment.imageUrl!, fit: BoxFit.cover),
                     ),
                   ),
                 ],
-                
+
                 const SizedBox(height: 8),
-                
+
                 // 查看作品详情按钮
                 if (comment.imageUrl != null)
                   GestureDetector(
@@ -507,7 +494,7 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
               ],
             ),
           ),
-          
+
           // 点赞按钮
           GestureDetector(
             onTap: () {
@@ -520,8 +507,8 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
                 children: [
                   Icon(
                     comment.isLiked ? Icons.favorite : Icons.favorite_border,
-                    color: comment.isLiked 
-                        ? const Color(0xFFFF4757) 
+                    color: comment.isLiked
+                        ? const Color(0xFFFF4757)
                         : Colors.white.withValues(alpha: 0.6),
                     size: 18,
                   ),
@@ -593,9 +580,9 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
                 ),
               ),
             ),
-            
+
             const SizedBox(width: 20),
-            
+
             // 做同款按钮
             Expanded(
               child: GestureDetector(
@@ -646,7 +633,14 @@ class _ExploreDetailPageState extends State<ExploreDetailPage> {
     );
   }
 
-  void _createSimilar() {
+  Future<void> _createSimilar() async {
+    // 做同款前先确保用户已登录
+    final loggedIn = await AuthGuard.ensureLoggedIn(context);
+    if (!loggedIn) {
+      debugPrint('未登录，已中断“做同款”操作');
+      return;
+    }
+
     // 跳转到做同款页面
     Navigator.push(
       context,

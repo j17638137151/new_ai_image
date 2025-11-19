@@ -7,42 +7,45 @@ import 'package:permission_handler/permission_handler.dart';
 class CreateSimilarResultPage extends StatefulWidget {
   final String generatedImagePath; // AI生成的图片路径
   final String originalTitle; // 原作品标题
+  final String? prompt; // 用户输入的提示词
 
   const CreateSimilarResultPage({
-    super.key, 
+    super.key,
     required this.generatedImagePath,
     required this.originalTitle,
+    this.prompt,
   });
 
   @override
-  State<CreateSimilarResultPage> createState() => _CreateSimilarResultPageState();
+  State<CreateSimilarResultPage> createState() =>
+      _CreateSimilarResultPageState();
 }
 
 class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
     with TickerProviderStateMixin {
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
-  
+
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     // 初始化滑入动画
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 1.0), // 从下方开始
-      end: Offset.zero, // 到达正常位置
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutQuart,
-    ));
-    
+
+    _slideAnimation =
+        Tween<Offset>(
+          begin: const Offset(0.0, 1.0), // 从下方开始
+          end: Offset.zero, // 到达正常位置
+        ).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutQuart),
+        );
+
     // 开始滑入动画
     _slideController.forward();
   }
@@ -64,23 +67,21 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
             children: [
               // 顶部导航栏
               _buildTopBar(),
-              
+
               // 主要内容区域
               Expanded(
                 child: Column(
                   children: [
                     // 标题区域
                     _buildTitleSection(),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // 图片展示区域
-                    Expanded(
-                      child: _buildImageSection(),
-                    ),
-                    
+                    Expanded(child: _buildImageSection()),
+
                     const SizedBox(height: 20),
-                    
+
                     // 底部按钮区域
                     _buildBottomButtons(),
                   ],
@@ -100,11 +101,7 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
         children: [
           GestureDetector(
             onTap: _goBack,
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
           const Spacer(),
         ],
@@ -156,10 +153,7 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
         borderRadius: BorderRadius.circular(16),
         child: AspectRatio(
           aspectRatio: 9 / 16, // 保持9:16比例
-          child: Container(
-            width: double.infinity,
-            child: _buildImageWidget(),
-          ),
+          child: Container(width: double.infinity, child: _buildImageWidget()),
         ),
       ),
     );
@@ -171,15 +165,15 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
       if (widget.generatedImagePath.isEmpty) {
         return _buildImageError('图片路径为空');
       }
-      
+
       // 判断是本地文件还是网络图片
-      if (widget.generatedImagePath.startsWith('/') || 
+      if (widget.generatedImagePath.startsWith('/') ||
           widget.generatedImagePath.startsWith('file://')) {
         final file = File(widget.generatedImagePath);
         if (!file.existsSync()) {
           return _buildImageError('图片文件不存在');
         }
-        
+
         return Image.file(
           file,
           fit: BoxFit.cover,
@@ -198,9 +192,11 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
               child: CircularProgressIndicator(
                 value: loadingProgress.expectedTotalBytes != null
                     ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
+                          loadingProgress.expectedTotalBytes!
                     : null,
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF4757)),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  Color(0xFFFF4757),
+                ),
               ),
             );
           },
@@ -278,9 +274,9 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
               ),
             ),
           ),
-          
+
           const SizedBox(width: 16),
-          
+
           // 保存到相册按钮
           Expanded(
             child: GestureDetector(
@@ -288,8 +284,8 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  color: _isSaving 
-                      ? const Color(0xFF666666) 
+                  color: _isSaving
+                      ? const Color(0xFF666666)
                       : const Color(0xFFFF4757),
                   borderRadius: BorderRadius.circular(24),
                 ),
@@ -302,7 +298,9 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -343,11 +341,10 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
     Navigator.pop(context); // 返回到CreateSimilarPage
   }
 
-
   // 保存到相册
   Future<void> _saveToGallery() async {
     if (_isSaving) return;
-    
+
     setState(() {
       _isSaving = true;
     });
@@ -390,7 +387,7 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
       if (result['isSuccess'] == true) {
         // 触觉反馈
         HapticFeedback.lightImpact();
-        
+
         // 显示成功提示
         if (mounted) {
           _showSuccessDialog();
@@ -448,9 +445,9 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
                   size: 30,
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               const Text(
                 '需要存储权限',
                 style: TextStyle(
@@ -459,9 +456,9 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
                   color: Colors.black87,
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               const Text(
                 '请在设置中允许访问存储权限，以便保存图片到相册',
                 textAlign: TextAlign.center,
@@ -471,9 +468,9 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
                   height: 1.4,
                 ),
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               // 按钮组
               Row(
                 children: [
@@ -492,7 +489,10 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
                         ),
                         child: const Text(
                           '取消',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),
@@ -516,7 +516,10 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
                         ),
                         child: const Text(
                           '去设置',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),
@@ -618,7 +621,7 @@ class _CreateSimilarResultPageState extends State<CreateSimilarResultPage>
       }
     });
   }
-  
+
   // 显示保存失败对话框
   void _showErrorDialog(String message) {
     showDialog(

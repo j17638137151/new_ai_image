@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'ai_model_service.dart';
+import 'generation_history_api_service.dart';
 import '../models/photobooth_model.dart';
 
 enum GenerationStatus {
@@ -175,6 +176,21 @@ class GenerationService extends ChangeNotifier {
     // 使用AI生成的真实结果
     if (_aiGeneratedImagePath != null) {
       _generatedResults = [_aiGeneratedImagePath!];
+
+      // 异步同步到对象存储和生成历史
+      final path = _aiGeneratedImagePath!;
+      final task = _currentTask;
+      if (task != null) {
+        unawaited(
+          GenerationHistoryApiService.syncGenerationResult(
+            localFilePath: path,
+            type: task.type,
+            effectId: task.effectId,
+          ).catchError((e, stack) {
+            debugPrint('同步生成历史失败: $e');
+          }),
+        );
+      }
     } else {
       // 兜底：如果AI生成失败，使用默认图片
       _generatedResults = [

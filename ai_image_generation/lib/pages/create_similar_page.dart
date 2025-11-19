@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:async';
 import '../models/explore_item_model.dart';
 import '../services/ai_model_service.dart';
+import '../services/auth_guard.dart';
+import '../services/generation_history_api_service.dart';
 import 'create_similar_result_page.dart';
 
 class CreateSimilarPage extends StatefulWidget {
   final ExploreItemModel originalItem;
 
-  const CreateSimilarPage({
-    super.key,
-    required this.originalItem,
-  });
+  const CreateSimilarPage({super.key, required this.originalItem});
 
   @override
   State<CreateSimilarPage> createState() => _CreateSimilarPageState();
@@ -22,7 +22,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
   List<File> _uploadedImages = [];
   final ImagePicker _picker = ImagePicker();
   bool _isGenerating = false; // 跟踪生成状态，避免重复操作
-  
+
   // 获取允许上传的最大图片数量
   int get _maxImageCount => widget.originalItem.uploadImageCount;
 
@@ -52,7 +52,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
             children: [
               // 顶部导航栏
               _buildTopNavBar(),
-              
+
               // 主要内容区域
               Expanded(
                 child: SingleChildScrollView(
@@ -62,18 +62,18 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
                     children: [
                       // 图片上传区域
                       _buildImageUploadSection(),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // 提示词编辑区域
                       _buildPromptSection(),
-                      
+
                       const SizedBox(height: 40),
                     ],
                   ),
                 ),
               ),
-              
+
               // 底部生成按钮
               _buildBottomGenerateButton(),
             ],
@@ -90,22 +90,14 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
           const Spacer(),
           GestureDetector(
             onTap: () {
               // TODO: 更多选项
             },
-            child: const Icon(
-              Icons.more_horiz,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const Icon(Icons.more_horiz, color: Colors.white, size: 24),
           ),
         ],
       ),
@@ -126,7 +118,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // 图片网格
           Wrap(
             spacing: 12,
@@ -134,7 +126,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
             children: [
               // 已上传的图片
               ..._uploadedImages.map((image) => _buildImageItem(image)),
-              
+
               // 上传按钮（如果未达到上限）
               if (_uploadedImages.length < _maxImageCount) _buildUploadButton(),
             ],
@@ -157,14 +149,9 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
           // 图片内容
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              image,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
-            ),
+            child: Image.file(image, width: 80, height: 80, fit: BoxFit.cover),
           ),
-          
+
           // 删除按钮
           Positioned(
             top: 4,
@@ -178,11 +165,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
                   color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: 14,
-                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 14),
               ),
             ),
           ),
@@ -268,7 +251,6 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
     );
   }
 
-
   Widget _buildBottomGenerateButton() {
     return Container(
       padding: EdgeInsets.only(
@@ -312,7 +294,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
               ),
             ],
           ),
-          
+
           const SizedBox(width: 20),
           // 生成按钮
           Expanded(
@@ -333,7 +315,9 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -375,7 +359,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
       );
       return;
     }
-    
+
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -383,7 +367,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
         maxHeight: 1024,
         imageQuality: 80,
       );
-      
+
       if (image != null) {
         setState(() {
           _uploadedImages.add(File(image.path));
@@ -399,7 +383,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
       );
     }
   }
-  
+
   void _removeImage(File image) {
     setState(() {
       _uploadedImages.remove(image);
@@ -408,7 +392,14 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
 
   Future<void> _onGenerate() async {
     if (_isGenerating) return; // 防止重复点击
-    
+
+    // 生成前确保用户已登录
+    final loggedIn = await AuthGuard.ensureLoggedIn(context);
+    if (!loggedIn) {
+      debugPrint('未登录，已中断做同款生成操作');
+      return;
+    }
+
     if (_uploadedImages.length != _maxImageCount) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -418,7 +409,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
       );
       return;
     }
-    
+
     if (_promptController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -428,18 +419,18 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
       );
       return;
     }
-    
+
     setState(() {
       _isGenerating = true;
     });
-    
+
     // 显示生成进度
     _showGeneratingDialog();
-    
+
     try {
       debugPrint('🚀 开始AI生成: ${_promptController.text}');
       debugPrint('📸 上传图片数量: ${_uploadedImages.length}');
-      
+
       // 验证图片路径
       final imagePaths = _uploadedImages.map((file) => file.path).toList();
       for (final path in imagePaths) {
@@ -447,20 +438,32 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
           throw Exception('图片文件不存在或路径无效');
         }
       }
-      
+
       // 调用统一的AI生图服务
       final result = await AIModelService.processImages(
         imagePaths: imagePaths,
         prompt: _promptController.text.trim(),
       );
-      
+
       if (mounted) {
         // 关闭进度弹窗
         Navigator.pop(context);
-        
+
         if (result != null && result.isNotEmpty) {
           debugPrint('✅ AI生成成功: $result');
-          
+
+          // AI生成成功，立即同步到生成历史
+          final prompt = _promptController.text.trim();
+          unawaited(
+            GenerationHistoryApiService.syncGenerationResult(
+              localFilePath: result,
+              type: 'create_similar',
+              prompt: prompt,
+            ).catchError((e, stack) {
+              debugPrint('同步做同款历史失败: $e');
+            }),
+          );
+
           // 跳转到结果页面
           Navigator.pushReplacement(
             context,
@@ -468,6 +471,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
               builder: (context) => CreateSimilarResultPage(
                 generatedImagePath: result,
                 originalTitle: widget.originalItem.name,
+                prompt: prompt,
               ),
             ),
           );
@@ -490,7 +494,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
         } catch (popError) {
           debugPrint('关闭弹窗失败: $popError');
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('生成失败: $e'),
@@ -507,7 +511,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
       }
     }
   }
-  
+
   // 显示生成进度弹窗
   void _showGeneratingDialog() {
     showDialog(
@@ -524,10 +528,7 @@ class _CreateSimilarPageState extends State<CreateSimilarPage> {
             Expanded(
               child: Text(
                 '正在处理中，请稍候...',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
           ],
